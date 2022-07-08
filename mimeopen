@@ -1,0 +1,490 @@
+#!/usr/bin/tclsh
+# Copyright (C) 2022 Oleg O. Nemanov <lego12239@yandex.ru>
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# https://github.com/lego12239/mimeopen
+
+set MAILCAP_FILES [list /etc/mailcap \
+  /usr/share/etc/mailcap /usr/local/etc/mailcap $env(HOME)/.mailcap]
+#set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
+
+set entries [dict create]
+
+proc mailcap_load {fnames} {
+	while {[llength $fnames] != 0} {
+		set fnames [lassign $fnames fname]
+		mailcap_load_file $fname
+	}
+}
+
+proc mailcap_load_file {fname} {
+	set line ""
+	set entry ""
+
+	if {[catch {open $fname r} fh]} {
+		if {([lindex $::errorCode 0] eq "POSIX") && ([lindex $::errorCode 1] eq "ENOENT")} {
+			return
+		}
+		puts $fh
+		exit 1
+	}
+
+	set ctx [dict create\
+	  src [dict create fname $fname fh $fh]\
+	  buf ""\
+	  pos 0\
+	  tok_s 0\
+	  lineno 0\
+	  read_proc _gets_for_fh\
+	  getsrcloc_proc _getsrcloc_for_fh]
+
+	while {1} {
+		set entry [mailcap_entry_parse ctx]
+		if {[dict size $entry] == 0} {
+			break
+		}
+#		puts "ENTRY: $entry"
+		mailcap_entries_add $entry
+	}
+	close $fh
+}
+
+proc mailcap_entries_add {entry} {
+	set mimetype [lindex [dict get $entry type] 0]
+	if {[llength [dict get $entry type]] == 2} {
+		set mimesubtype [lindex [dict get $entry type] 1]
+	} else {
+		set mimesubtype *
+	}
+	dict set ::entries $mimetype $mimesubtype [dict get $entry]
+}
+
+proc mailcap_entries_get {mimetype} {
+	set entry [dict create]
+
+	if {[dict exists $::entries {*}$mimetype]} {
+		set entry [dict get $::entries {*}$mimetype]
+	} elseif {[dict exists $::entries [lindex $mimetype 0] *]} {
+		set entry [dict get $::entries [lindex $mimetype 0] *]
+	} elseif {[dict exists $::entries * *]} {
+		set entry [dict get $::entries * *]
+	}
+
+	return $entry
+}
+
+# Parse a one entry from a configured source.
+# ret:
+#  "" - source is empty, no any entries
+#  DICT - parsed entry
+proc mailcap_entry_parse {_ctx} {
+	upvar $_ctx ctx
+	set entry [dict create type "" cmd "" src "" is_want_data_from_stdin 1]
+	# 0 - type field, 1 - command field, 2 - flag field
+	set state 0
+	set is_commented 0
+
+#	puts "INIT. POS: [dict get $ctx pos]. BUF: '[dict get $ctx buf]'"
+	while {[set tok [mailcap_entry_get_lexeme ctx]] >= 0} {
+		set tok_str [string range [dict get $ctx buf] [dict get $ctx tok_s]\
+		  [dict get $ctx pos]-1]
+#		puts "$state: $tok: '${tok_str}'"
+#		puts "BUF: '[dict get $ctx buf]'"
+		if {$is_commented} {
+			if {$tok == 3} {
+				set is_commented 0
+			}
+			continue
+		}
+		switch $state {
+		0 {
+			switch $tok {
+			0 {
+				dict append entry type $tok_str
+			}
+			1 {
+				if {[regexp {^[[:space:]]*$} [dict get $entry type]]} {
+					puts stderr [string cat \
+					  [[dict get $ctx getsrcloc_proc] ctx]\
+					  ": Empty type. Ignore this entry."]
+					set entry [dict create type "" cmd ""]
+					set is_commented 1
+				} else {
+					set str [string tolower [dict get $entry type]]
+					set str [split $str /]
+					if {[llength $str] > 0} {
+						lset str 0 [string trim [lindex $str 0]]
+					}
+					if {[llength $str] > 1} {
+						lset str 1 [string trim [lindex $str 1]]
+					}
+					dict set entry type $str
+					set state 1
+				}
+			}
+			3 {
+				if {![regexp {^[[:space:]]*$} [dict get $entry type]]} {
+					puts stderr [string cat \
+					  [[dict get $ctx getsrcloc_proc] ctx -1]\
+					  ": No command. Ignore this entry."]
+					set entry [dict create type "" cmd ""]
+				}
+				continue
+			}
+			4 {
+				set is_commented 1
+			}
+			5 {
+				dict append entry type [string index $tok_str 1]
+			}
+			6 {
+				dict append entry type " "
+			}
+			7 {
+				puts stderr [string cat "[[dict get $ctx getsrcloc_proc] ctx]: "
+				  "% sequence in a type field. Ignore this entry."]
+				set entry [dict create type "" cmd ""]
+				set is_commented 1
+			}
+			default {
+				error "unknown state/tok combination: $state/$tok"
+			}
+			}
+		}
+		1 {
+			switch $tok {
+			0 {
+				mailcap_entry_cmd_add_part entry 0 $tok_str
+			}
+			1 {
+				set state 2
+			}
+			3 {
+				if {[mailcap_entry_cmd_is_empty $entry]} {
+					puts stderr [string cat \
+					  [[dict get $ctx getsrcloc_proc] ctx -1]\
+					  ": Empty command. Ignore this entry."]
+					set state 0
+					set entry [dict create type "" cmd ""]
+				} else {
+					break
+				}
+			}
+			4 {
+				mailcap_entry_cmd_add_part entry 0 $tok_str
+			}
+			5 {
+				mailcap_entry_cmd_add_part entry 0 [string index $tok_str 1]
+			}
+			6 {
+				mailcap_entry_cmd_add_part entry 0 " "
+			}
+			7 {
+				if {$tok_str eq "%s"} {
+					dict set entry is_want_data_from_stdin 0
+				}
+				mailcap_entry_cmd_add_part entry 1 $tok_str
+			}
+			default {
+				error "unknown state/tok combination: $state/$tok"
+			}
+			}
+		}
+		2 {
+			switch $tok {
+			0 -
+			1 {
+			}
+			3 {
+				break
+			}
+			4 -
+			5 -
+			6 -
+			7 {
+			}
+			default {
+				error "unknown state/tok combination: $state/$tok"
+			}
+			}
+		}
+		}
+	}
+	dict set ctx buf [string range [dict get $ctx buf]\
+	  [dict get $ctx pos] end]
+	dict set ctx pos 0
+	# Join multiline entry into one line
+#	if {[string index $line end] eq "\\"} {
+#		append entry [string range $line 0 end-1]
+#		continue
+#	}
+
+	if {$state == 0} {
+		return ""
+	}
+	dict set entry src [[dict get $ctx getsrcloc_proc] ctx -1]
+	return $entry
+}
+
+# Add a next part to a command
+# prms:
+#  _entry - entry var name
+#  ptype  - a part type(0 - ordinary text, 1 - % sequence)
+#  ptxt   - a part text
+proc mailcap_entry_cmd_add_part {_entry ptype ptxt} {
+	upvar $_entry entry
+
+	dict lappend entry cmd [list $ptype $ptxt]
+}
+
+proc mailcap_entry_cmd_is_empty {entry} {
+
+	foreach part [dict get $entry cmd] {
+		if {[lindex $part 0] != 0} {
+			return 0
+		}
+		if {![regexp {^[[:space:]]+$} [lindex $part 1]]} {
+			return 0
+		}
+	}
+
+	return 1
+}
+
+proc mailcap_entry_cmd_subs {entry {vals ""}} {
+	set cmd ""
+
+	foreach part [dict get $entry cmd] {
+		switch -- [lindex $part 0] {
+		0 {
+			append cmd [lindex $part 1]
+		}
+		1 {
+			if {[dict exists $vals [lindex $part 1]]} {
+				append cmd [dict get $vals [lindex $part 1]]
+			}
+		}
+		default {
+			error "Unknown cmd part type: [lindex $part 0]"
+		}
+		}
+	}
+
+	return $cmd
+}
+
+# ret:
+# -2 - incomplete \ or % sequence(there are no other chars in a buf)
+# -1 - no data, empty buffer
+#  0 - ordinary chars(use string trimright to remove possible spaces at the end)
+#  1 - ;
+#  3 - \n
+#  4 - #
+#  5 - \ + ANY_SINGLE_CHAR
+#  6 - \ + \n
+#  7 - % + ANY_SINGLE_CHAR
+proc mailcap_entry_get_lexeme {_ctx} {
+	upvar $_ctx ctx
+	# 0 - start, 1 - ordinary char, 2 - \ sequence, 3 - % sequence
+	set state 0
+	set running 1
+
+	dict set ctx tok_s [set i [dict get $ctx pos]]
+	while {$running} {
+		set len [string length [dict get $ctx buf]]
+		for {} {$i < $len} {incr i} {
+			set c [string index [dict get $ctx buf] $i]
+			dict incr ctx pos
+			switch $state {
+			0 {
+				switch $c {
+				; {
+					return 1
+				}
+				"\\" {
+					set state 2
+				}
+				"\n" {
+					return 3
+				}
+				"#" {
+					return 4
+				}
+				"%" {
+					set state 3
+				}
+				default {
+					set state 1
+				}
+				}
+			}
+			1 {
+				switch $c {
+				; -
+				"\\" -
+				"\n" -
+				"#" -
+				"%" {
+					dict incr ctx pos -1
+					return 0
+				}
+				}
+			}
+			2 {
+				if {$c eq "\n"} {
+					return 6
+				}
+				return 5
+			}
+			3 {
+				return 7
+			}
+			}
+		}
+
+		set ret [[dict get $ctx read_proc] ctx line]
+		if {$ret < 0} {
+			set running 0
+		} else {
+			if {[dict get $ctx lineno] > 1} {
+				dict append ctx buf "\n"
+			}
+			dict append ctx buf "$line"
+		}
+	}
+	switch $state {
+	0 {
+		return -1
+	}
+	1 {
+		return 0
+	}
+	2 -
+	3 {
+		return -2
+	}
+	}
+}
+
+######################################################################
+# ROUTINES FOR VARIOUS SOURCES
+######################################################################
+proc _gets_for_fh {_ctx _line} {
+	upvar $_ctx ctx
+	upvar $_line line
+
+	dict incr ctx lineno
+	return [gets [dict get $ctx src fh] line]
+}
+
+proc _getsrcloc_for_fh {_ctx {lineno_off 0}} {
+	upvar $_ctx ctx
+
+	set lineno [expr {[dict get $ctx lineno] + $lineno_off}]
+	return "[dict get $ctx src fname]:$lineno"
+}
+
+######################################################################
+# MAILCAP RUN ROUTINES
+######################################################################
+proc mailcap_run {mimetype fname} {
+	set entry [mailcap_entries_get [dict get $mimetype type]]
+	if {[dict size $entry] == 0} {
+		puts stderr [string cat "Don't know how to open "\
+		  [join [dict get $mimetype type] "/"] ": " $fname]
+		return
+	}
+
+	set vals [dict create \
+	  "%s" $fname\
+	  "%t" [join [dict get $mimetype type] "/"]]
+	set cmd [mailcap_entry_cmd_subs $entry $vals]
+#	puts "USE CMD for '$fname': $cmd"
+	if {[dict get $entry is_want_data_from_stdin]} {
+		exec sh -c "$cmd" <$fname >@stdout
+	} else {
+		exec sh -c "$cmd" >@stdout
+	}
+}
+
+######################################################################
+# MIME TYPE ROUTINES
+######################################################################
+proc mimetype_parse {str} {
+	set type [dict create]
+
+	set pos [string first ";" $str]
+	set parts [split [string range $str 0 $pos-1] /]
+	dict lappend type type [string tolower [string trim [lindex $parts 0]]]
+	dict lappend type type [string tolower [string trim [lindex $parts 1]]]
+
+	set parts [split [string range $str $pos+1 end] ";"]
+	foreach part $parts {
+		set pos [string first = $part]
+		dict set type prms \
+		  [string tolower [string trim [string range $part 0 $pos-1]]]\
+		  [string trim [string range $part $pos+1 end]]
+	}
+
+	return $type
+}
+
+
+######################################################################
+# MAIN
+######################################################################
+for {set i 0} {$i < [llength $argv]} {incr i} {
+	switch -glob -- [lindex $argv $i] {
+	"-v" {
+		puts "0.1"
+		exit
+	}
+	"-h" {
+		puts "USAGE: [file tail $argv0] FILE_NAME ..."
+		puts " Options:"
+		puts "  -?   ????"
+		exit
+	}
+	"--" {
+		incr i
+		break
+	}
+	"-*" {
+		puts stderr "Unknown option: [lindex $argv $i]"
+		exit 1
+	}
+	default {
+		break
+	}
+	}
+}
+
+mailcap_load $MAILCAP_FILES
+#puts $entries
+
+for {} {$i < [llength $argv]} {incr i} {
+	set mimetype [mimetype_parse [exec file -b -i [lindex $argv $i]]]
+#	puts $mimetype
+	mailcap_run $mimetype [lindex $argv $i]
+}
