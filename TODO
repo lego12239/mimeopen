@@ -1,3 +1,6 @@
+- reread rfc1524(may be something is missed)
+- add support for MAILCAPS env var
+- rename entry cmd to view_cmd
 - add support for mailcap entries flags fields
 - store entries for an equal type in a list; we try to run a command in order, if
   a 1st command is fail, try 2nd and so on.
@@ -7,4 +10,5 @@
 - add option to pass several files to one command instance
 - add support for DIR instead of FILE_NAME as an argument
 - add option for just outputing a command without running
+- add option for parallel program run(in contrast to sequential, default mode)?
 - add autotests
