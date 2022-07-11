@@ -3,7 +3,7 @@ Overview
 
 mimeopen is an utility for opening files with a program specific to its mime
 type(based on mailcap files).
-It use a mailcap file to detect a right command line for an each file.
+It use a mailcap file(rfc1524) to detect a right command line for an each file.
 
 Dependencies
 ============
