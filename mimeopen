@@ -29,7 +29,15 @@ set MAILCAP_FILES [list /etc/mailcap \
   /usr/share/etc/mailcap /usr/local/etc/mailcap $env(HOME)/.mailcap]
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
 
+set debug 0
 set entries [dict create]
+
+proc dbg_out {msg} {
+	if {!$::debug} {
+		return
+	}
+	puts "DBG: $msg"
+}
 
 proc mailcap_load {fnames} {
 	while {[llength $fnames] != 0} {
@@ -64,7 +72,7 @@ proc mailcap_load_file {fname} {
 		if {[dict size $entry] == 0} {
 			break
 		}
-#		puts "ENTRY: $entry"
+		dbg_out "Entry: '$entry'"
 		mailcap_entries_add $entry
 	}
 	close $fh
@@ -105,12 +113,12 @@ proc mailcap_entry_parse {_ctx} {
 	set state 0
 	set is_commented 0
 
-#	puts "INIT. POS: [dict get $ctx pos]. BUF: '[dict get $ctx buf]'"
+#	dbg_out "mailcap_entry_parse enter: POS: [dict get $ctx pos]. BUF: '[dict get $ctx buf]'"
 	while {[set tok [mailcap_entry_get_lexeme ctx]] >= 0} {
 		set tok_str [string range [dict get $ctx buf] [dict get $ctx tok_s]\
 		  [dict get $ctx pos]-1]
-#		puts "$state: $tok: '${tok_str}'"
-#		puts "BUF: '[dict get $ctx buf]'"
+#		dbg_out "mailcap_entry_parse: $state: $tok: '${tok_str}'"
+#		dbg_out "mailcap_entry_parse: BUF: '[dict get $ctx buf]'"
 		if {$is_commented} {
 			if {$tok == 3} {
 				set is_commented 0
@@ -415,7 +423,7 @@ proc mailcap_run {mimetype fname} {
 	  "%s" $fname\
 	  "%t" [join [dict get $mimetype type] "/"]]
 	set cmd [mailcap_entry_cmd_subs $entry $vals]
-#	puts "USE CMD for '$fname': $cmd"
+	dbg_out "Open '$fname' with command '$cmd'"
 	if {[dict get $entry is_want_data_from_stdin]} {
 		exec sh -c "$cmd" <$fname >@stdout
 	} else {
@@ -451,6 +459,9 @@ proc mimetype_parse {str} {
 ######################################################################
 for {set i 0} {$i < [llength $argv]} {incr i} {
 	switch -glob -- [lindex $argv $i] {
+	"-d" {
+		set debug 1
+	}
 	"-v" {
 		puts "0.1"
 		exit
@@ -458,7 +469,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 	"-h" {
 		puts "USAGE: [file tail $argv0] FILE_NAME ..."
 		puts " Options:"
-		puts "  -?   ????"
+		puts "  -d   output debug info"
 		exit
 	}
 	"--" {
@@ -478,13 +489,13 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 if {[llength [array names env -exact MAILCAPS]] == 1} {
 	set MAILCAP_FILES [split $env(MAILCAPS) ":"]
 }
-#puts "MAILCAP_FILES: $MAILCAP_FILES"
+dbg_out "MAILCAP_FILES=$MAILCAP_FILES"
 
 mailcap_load $MAILCAP_FILES
-#puts $entries
+dbg_out "ENTRIES=$entries"
 
 for {} {$i < [llength $argv]} {incr i} {
 	set mimetype [mimetype_parse [exec file -b -i [lindex $argv $i]]]
-#	puts $mimetype
+	dbg_out "mimetype for '[lindex $argv $i]' is '$mimetype'"
 	mailcap_run $mimetype [lindex $argv $i]
 }

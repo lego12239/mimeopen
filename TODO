@@ -5,7 +5,6 @@
   a 1st command is fail, try 2nd and so on.
 - add support for test flag
 - add %{} support for command field
-- add -d for debug output
 - add option to pass several files to one command instance
 - add support for DIR instead of FILE_NAME as an argument
 - add option for just outputing a command without running
