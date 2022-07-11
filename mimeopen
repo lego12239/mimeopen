@@ -480,6 +480,11 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 	}
 }
 
+if {[llength [array names env -exact MAILCAPS]] == 1} {
+	set MAILCAP_FILES [split $env(MAILCAPS) ":"]
+}
+#puts "MAILCAP_FILES: $MAILCAP_FILES"
+
 mailcap_load $MAILCAP_FILES
 #puts $entries
 

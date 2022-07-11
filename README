@@ -14,3 +14,9 @@ Using
 =====
 
 mimeopen FILE_NAME ...
+
+Locations for mailcap files can be specified with MAILCAPS environment variable.
+MAILCAPS contain pathes separated by colon(like in PATH variable). If there is
+no MAILCAPS variable in an environment, then by default it value is:
+
+/etc/mailcap:/usr/share/etc/mailcap:/usr/local/etc/mailcap:$HOME/.mailcap

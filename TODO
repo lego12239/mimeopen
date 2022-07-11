@@ -1,5 +1,4 @@
 - reread rfc1524(may be something is missed)
-- add support for MAILCAPS env var
 - rename entry cmd to view_cmd
 - add support for mailcap entries flags fields
 - store entries for an equal type in a list; we try to run a command in order, if
