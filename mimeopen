@@ -234,11 +234,6 @@ proc mailcap_entry_parse {_ctx} {
 	dict set ctx buf [string range [dict get $ctx buf]\
 	  [dict get $ctx pos] end]
 	dict set ctx pos 0
-	# Join multiline entry into one line
-#	if {[string index $line end] eq "\\"} {
-#		append entry [string range $line 0 end-1]
-#		continue
-#	}
 
 	if {$state == 0} {
 		return ""
