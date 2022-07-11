@@ -108,7 +108,7 @@ proc mailcap_entries_get {mimetype} {
 #  DICT - parsed entry
 proc mailcap_entry_parse {_ctx} {
 	upvar $_ctx ctx
-	set entry [dict create type "" cmd "" src "" is_want_data_from_stdin 1]
+	set entry [mailcap_entry_create]
 	# 0 - type field, 1 - command field, 2 - flag field
 	set state 0
 	set is_commented 0
@@ -136,7 +136,7 @@ proc mailcap_entry_parse {_ctx} {
 					puts stderr [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx]\
 					  ": Empty type. Ignore this entry."]
-					set entry [dict create type "" cmd ""]
+					set entry [mailcap_entry_create]
 					set is_commented 1
 				} else {
 					set str [string tolower [dict get $entry type]]
@@ -156,7 +156,7 @@ proc mailcap_entry_parse {_ctx} {
 					puts stderr [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx -1]\
 					  ": No command. Ignore this entry."]
-					set entry [dict create type "" cmd ""]
+					set entry [mailcap_entry_create]
 				}
 				continue
 			}
@@ -172,7 +172,7 @@ proc mailcap_entry_parse {_ctx} {
 			7 {
 				puts stderr [string cat "[[dict get $ctx getsrcloc_proc] ctx]: "
 				  "% sequence in a type field. Ignore this entry."]
-				set entry [dict create type "" cmd ""]
+				set entry [mailcap_entry_create]
 				set is_commented 1
 			}
 			default {
@@ -194,7 +194,7 @@ proc mailcap_entry_parse {_ctx} {
 					  [[dict get $ctx getsrcloc_proc] ctx -1]\
 					  ": Empty command. Ignore this entry."]
 					set state 0
-					set entry [dict create type "" cmd ""]
+					set entry [mailcap_entry_create]
 				} else {
 					break
 				}
@@ -247,6 +247,16 @@ proc mailcap_entry_parse {_ctx} {
 		return ""
 	}
 	dict set entry src [[dict get $ctx getsrcloc_proc] ctx -1]
+	return $entry
+}
+
+proc mailcap_entry_create {} {
+	set entry [dict create \
+	  type ""\
+	  cmd ""\
+	  src ""\
+	  is_want_data_from_stdin 1]
+
 	return $entry
 }
 
