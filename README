@@ -1,10 +1,16 @@
 Overview
 ========
 
-mimeopen is an utility for opening files based on its mime type.
+mimeopen is an utility for opening files with a program specific to its mime
+type(based on mailcap files).
 It use a mailcap file to detect a right command line for an each file.
+
+Dependencies
+============
+
+mimeopen use file program to detect a mime type of specified files.
 
 Using
 =====
 
-mimeopen FILE_NAME
+mimeopen FILE_NAME ...
