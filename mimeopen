@@ -39,6 +39,14 @@ proc dbg_out {msg} {
 	puts "DBG: $msg"
 }
 
+proc err_out {msg} {
+	puts stderr "ERR: $msg"
+}
+
+proc warn_out {msg} {
+	puts stderr "WARN: $msg"
+}
+
 proc mailcap_load {fnames} {
 	while {[llength $fnames] != 0} {
 		set fnames [lassign $fnames fname]
@@ -133,7 +141,7 @@ proc mailcap_entry_parse {_ctx} {
 			}
 			1 {
 				if {[regexp {^[[:space:]]*$} [dict get $entry type]]} {
-					puts stderr [string cat \
+					warn_out [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx]\
 					  ": Empty type. Ignore this entry."]
 					set entry [mailcap_entry_create]
@@ -153,7 +161,7 @@ proc mailcap_entry_parse {_ctx} {
 			}
 			3 {
 				if {![regexp {^[[:space:]]*$} [dict get $entry type]]} {
-					puts stderr [string cat \
+					warn_out [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx -1]\
 					  ": No command. Ignore this entry."]
 					set entry [mailcap_entry_create]
@@ -170,7 +178,7 @@ proc mailcap_entry_parse {_ctx} {
 				dict append entry type " "
 			}
 			7 {
-				puts stderr [string cat "[[dict get $ctx getsrcloc_proc] ctx]: "
+				warn_out [string cat "[[dict get $ctx getsrcloc_proc] ctx]: "
 				  "% sequence in a type field. Ignore this entry."]
 				set entry [mailcap_entry_create]
 				set is_commented 1
@@ -190,7 +198,7 @@ proc mailcap_entry_parse {_ctx} {
 			}
 			3 {
 				if {[mailcap_entry_cmd_is_empty $entry]} {
-					puts stderr [string cat \
+					warn_out [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx -1]\
 					  ": Empty command. Ignore this entry."]
 					set state 0
@@ -424,7 +432,7 @@ proc _getsrcloc_for_fh {_ctx {lineno_off 0}} {
 proc mailcap_run {mimetype fname} {
 	set entry [mailcap_entries_get [dict get $mimetype type]]
 	if {[dict size $entry] == 0} {
-		puts stderr [string cat "Don't know how to open "\
+		err_out [string cat "Don't know how to open "\
 		  [join [dict get $mimetype type] "/"] ": " $fname]
 		return
 	}
@@ -487,7 +495,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 		break
 	}
 	"-*" {
-		puts stderr "Unknown option: [lindex $argv $i]"
+		err_out "Unknown option: [lindex $argv $i]"
 		exit 1
 	}
 	default {
