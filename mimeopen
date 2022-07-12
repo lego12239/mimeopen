@@ -499,7 +499,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 		set debug 1
 	}
 	"-v" {
-		puts "0.1"
+		puts "0.2"
 		exit
 	}
 	"-h" {
