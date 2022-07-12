@@ -60,11 +60,13 @@ proc mailcap_load_file {fname} {
 
 	if {[catch {open $fname r} fh]} {
 		if {([lindex $::errorCode 0] eq "POSIX") && ([lindex $::errorCode 1] eq "ENOENT")} {
+			dbg_out "Can't open '$fname': no such file"
 			return
 		}
 		err_out "Open error: '$fname': $fh"
 		exit 1
 	}
+	dbg_out "Loading from '$fname'"
 
 	set ctx [dict create\
 	  src [dict create fname $fname fh $fh]\
