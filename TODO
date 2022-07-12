@@ -3,8 +3,6 @@
 - rename entry src to _(we don't want to mix with entry flag fields),
   move is_want_data_from_stdin into _ too
 - add support for mailcap entries flags fields
-- store entries for an equal type in a list; we try to run a command in order, if
-  a 1st command is fail, try 2nd and so on.
 - add support for test flag
 - add %{} support for command field
 - add option to pass several files to one command instance

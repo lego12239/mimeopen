@@ -87,27 +87,33 @@ proc mailcap_load_file {fname} {
 }
 
 proc mailcap_entries_add {entry} {
+	set vals [list]
+
 	set mimetype [lindex [dict get $entry type] 0]
 	if {[llength [dict get $entry type]] == 2} {
 		set mimesubtype [lindex [dict get $entry type] 1]
 	} else {
 		set mimesubtype *
 	}
-	dict set ::entries $mimetype $mimesubtype [dict get $entry]
+	if {[dict exists $::entries $mimetype $mimesubtype]} {
+		set vals [dict get $::entries $mimetype $mimesubtype]
+	}
+	lappend vals $entry
+	dict set ::entries $mimetype $mimesubtype $vals
 }
 
 proc mailcap_entries_get {mimetype} {
-	set entry [dict create]
+	set entries_list [list]
 
 	if {[dict exists $::entries {*}$mimetype]} {
-		set entry [dict get $::entries {*}$mimetype]
+		set entries_list [dict get $::entries {*}$mimetype]
 	} elseif {[dict exists $::entries [lindex $mimetype 0] *]} {
-		set entry [dict get $::entries [lindex $mimetype 0] *]
+		set entries_list [dict get $::entries [lindex $mimetype 0] *]
 	} elseif {[dict exists $::entries * *]} {
-		set entry [dict get $::entries * *]
+		set entries_list [dict get $::entries * *]
 	}
 
-	return $entry
+	return $entries_list
 }
 
 # Parse a one entry from a configured source.
@@ -430,23 +436,33 @@ proc _getsrcloc_for_fh {_ctx {lineno_off 0}} {
 # MAILCAP RUN ROUTINES
 ######################################################################
 proc mailcap_run {mimetype fname} {
-	set entry [mailcap_entries_get [dict get $mimetype type]]
-	if {[dict size $entry] == 0} {
+	set entries_list [mailcap_entries_get [dict get $mimetype type]]
+	if {[llength $entries_list] == 0} {
 		err_out [string cat "Don't know how to open "\
 		  [join [dict get $mimetype type] "/"] ": " $fname]
 		return
 	}
 
+	set err_msg ""
 	set vals [dict create \
 	  "%s" $fname\
 	  "%t" [join [dict get $mimetype type] "/"]]
-	set cmd [mailcap_entry_cmd_subs $entry $vals]
-	dbg_out "Open '$fname' with command '$cmd'"
-	if {[dict get $entry is_want_data_from_stdin]} {
-		exec sh -c "$cmd" <$fname >@stdout
-	} else {
-		exec sh -c "$cmd" >@stdout
+	foreach entry $entries_list {
+		dbg_out "Try use for '$fname' entry '$entry'"
+		set cmd [mailcap_entry_cmd_subs $entry $vals]
+		dbg_out "Try open '$fname' with command '$cmd'"
+		if {[dict get $entry is_want_data_from_stdin]} {
+			set exec_args [list sh -c "$cmd" <$fname >@stdout]
+		} else {
+			set exec_args [list sh -c "$cmd" >@stdout]
+		}
+		if {![catch {exec {*}$exec_args} res]} {
+			return
+		}
+		dbg_out "cmd '$cmd' fail with error message: $res"
+		append err_msg "cmd '$cmd' fail with error message: $res\n"
 	}
+	err_out $err_msg
 }
 
 ######################################################################
