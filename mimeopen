@@ -25,8 +25,8 @@
 #
 # https://github.com/lego12239/mimeopen
 
-set MAILCAP_FILES [list /etc/mailcap \
-  /usr/share/etc/mailcap /usr/local/etc/mailcap $env(HOME)/.mailcap]
+set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
+  /usr/share/etc/mailcap /usr/local/etc/mailcap]
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
 
 set debug 0
