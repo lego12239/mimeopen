@@ -62,7 +62,7 @@ proc mailcap_load_file {fname} {
 		if {([lindex $::errorCode 0] eq "POSIX") && ([lindex $::errorCode 1] eq "ENOENT")} {
 			return
 		}
-		puts $fh
+		err_out "Open error: '$fname': $fh"
 		exit 1
 	}
 
