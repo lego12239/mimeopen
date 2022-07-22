@@ -7,7 +7,6 @@
 - add %{} support for command field
 - add option to pass several files to one command instance
 - add support for DIR instead of FILE_NAME as an argument
-- add option for just outputing a command without running
 - add option for parallel program run(in contrast to sequential, default mode)?
 - add autotests
 - add option for opening file for editing/composing

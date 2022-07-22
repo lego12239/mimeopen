@@ -30,6 +30,7 @@ set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
 
 set debug 0
+set dry_run 0
 set entries [dict create]
 
 proc dbg_out {msg} {
@@ -458,11 +459,19 @@ proc mailcap_run {mimetype fname} {
 		} else {
 			set exec_args [list sh -c "$cmd" >@stdout]
 		}
-		if {![catch {exec {*}$exec_args} res]} {
-			return
+		if {$::dry_run} {
+			puts "CMD: '$cmd'"
+			set res ""
+		} else {
+			if {![catch {exec {*}$exec_args} res]} {
+				return
+			}
 		}
 		dbg_out "cmd '$cmd' fail with error message: $res"
 		append err_msg "cmd '$cmd' fail with error message: $res\n"
+	}
+	if {$::dry_run} {
+		return
 	}
 	err_out $err_msg
 }
@@ -498,14 +507,19 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 	"-d" {
 		set debug 1
 	}
+	"--dry-run" {
+		set dry_run 1
+	}
 	"-v" {
-		puts "0.1"
+		puts "0.2"
 		exit
 	}
 	"-h" {
 		puts "USAGE: [file tail $argv0] FILE_NAME ..."
 		puts " Options:"
 		puts "  -d   output debug info"
+		puts "  --dry-run"
+		puts "       output view command without executing"
 		exit
 	}
 	"--" {
