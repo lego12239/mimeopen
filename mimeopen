@@ -520,6 +520,8 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 		puts "  -d   output debug info"
 		puts "  --dry-run"
 		puts "       output view command without executing"
+		puts "  -v   output a version"
+		puts "  -h   output this help"
 		exit
 	}
 	"--" {
