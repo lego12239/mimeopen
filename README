@@ -8,7 +8,18 @@ It use a mailcap file(rfc1524) to detect a right command line for an each file.
 Dependencies
 ============
 
-mimeopen use file program to detect a mime type of specified files.
+mimeopen use:
+- file program(to detect a mime type of specified files).
+- getopt package(https://github.com/lego12239/getopt.tcl).
+
+
+Setup
+============
+
+Change the line(at the top of the mimeopen source) with auto_path variable
+modification to reflect getopt package location and then:
+cp mimeopen ~/bin/
+ln -s ~/bin/mimeopen ~/bin/open
 
 Using
 =====
@@ -20,3 +31,4 @@ MAILCAPS contain pathes separated by colon(like in PATH variable). If there is
 no MAILCAPS variable in an environment, then by default it value is:
 
 $HOME/.mailcap:/etc/mailcap:/usr/share/etc/mailcap:/usr/local/etc/mailcap
+
