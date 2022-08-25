@@ -35,6 +35,7 @@ set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
 
 set debug 0
 set dry_run 0
+set opt_background 0
 set entries [dict create]
 
 proc dbg_out {msg} {
@@ -463,6 +464,9 @@ proc mailcap_run {mimetype fname} {
 		} else {
 			set exec_args [list sh -c "$cmd" >@stdout]
 		}
+		if {$::opt_background} {
+			lappend exec_args "&"
+		}
 		if {$::dry_run} {
 			puts "CMD: '$cmd'"
 			set res ""
@@ -505,6 +509,7 @@ proc mimetype_parse {str} {
 proc parse_opts {} {
 	global argv
 	set optsspec {
+	  "-b --background" 0
 	  "-d --debug" 0
 	  "--dry-run" 0
 	  "-v --version" 0
@@ -514,6 +519,9 @@ proc parse_opts {} {
 
 	while {[llength [set ov [getopt::next ctx argv]]] > 0} {
 		switch -glob -- [lindex $ov 0] {
+		"-b --background" {
+			set ::opt_background 1
+		}
 		"-d --debug" {
 			set ::debug 1
 		}
@@ -527,6 +535,8 @@ proc parse_opts {} {
 		"-h --help" {
 			puts "USAGE: [file tail $::argv0] FILE_NAME ..."
 			puts " Options:"
+			puts "  -b, --background"
+			puts "               open file in the background"
 			puts "  -d, --debug  output debug info"
 			puts "  --dry-run    output view command without executing"
 			puts "  -v, --version"
