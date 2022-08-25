@@ -25,6 +25,10 @@
 #
 # https://github.com/lego12239/mimeopen
 
+lappend auto_path ~/work/libs/tcl/getopt
+package require getopt
+
+
 set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
   /usr/share/etc/mailcap /usr/local/etc/mailcap]
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
@@ -498,45 +502,48 @@ proc mimetype_parse {str} {
 	return $type
 }
 
+proc parse_opts {} {
+	global argv
+	set optsspec {
+	  "-d --debug" 0
+	  "--dry-run" 0
+	  "-v --version" 0
+	  "-h --help" 0}
+
+	set ctx [getopt::mkctx $optsspec {err_on_unknown_opt 1}]
+
+	while {[llength [set ov [getopt::next ctx argv]]] > 0} {
+		switch -glob -- [lindex $ov 0] {
+		"-d --debug" {
+			set ::debug 1
+		}
+		"--dry-run" {
+			set ::dry_run 1
+		}
+		"-v --version" {
+			puts "0.2"
+			exit
+		}
+		"-h --help" {
+			puts "USAGE: [file tail $::argv0] FILE_NAME ..."
+			puts " Options:"
+			puts "  -d, --debug  output debug info"
+			puts "  --dry-run    output view command without executing"
+			puts "  -v, --version"
+			puts "               output a version"
+			puts "  -h, --help   output this help"
+			exit
+		}
+		}
+	}
+
+}
+
 
 ######################################################################
 # MAIN
 ######################################################################
-for {set i 0} {$i < [llength $argv]} {incr i} {
-	switch -glob -- [lindex $argv $i] {
-	"-d" {
-		set debug 1
-	}
-	"--dry-run" {
-		set dry_run 1
-	}
-	"-v" {
-		puts "0.2"
-		exit
-	}
-	"-h" {
-		puts "USAGE: [file tail $argv0] FILE_NAME ..."
-		puts " Options:"
-		puts "  -d   output debug info"
-		puts "  --dry-run"
-		puts "       output view command without executing"
-		puts "  -v   output a version"
-		puts "  -h   output this help"
-		exit
-	}
-	"--" {
-		incr i
-		break
-	}
-	"-*" {
-		err_out "Unknown option: [lindex $argv $i]"
-		exit 1
-	}
-	default {
-		break
-	}
-	}
-}
+parse_opts
 
 if {[llength [array names env -exact MAILCAPS]] == 1} {
 	set MAILCAP_FILES [split $env(MAILCAPS) ":"]
@@ -546,8 +553,8 @@ dbg_out "MAILCAP_FILES=$MAILCAP_FILES"
 mailcap_load $MAILCAP_FILES
 dbg_out "ENTRIES=$entries"
 
-for {} {$i < [llength $argv]} {incr i} {
-	set mimetype [mimetype_parse [exec file -b -i [lindex $argv $i]]]
-	dbg_out "mimetype for '[lindex $argv $i]' is '$mimetype'"
-	mailcap_run $mimetype [lindex $argv $i]
+foreach fname $argv {
+	set mimetype [mimetype_parse [exec file -b -i $fname]]
+	dbg_out "mimetype for '$fname' is '$mimetype'"
+	mailcap_run $mimetype $fname
 }
