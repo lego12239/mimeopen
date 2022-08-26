@@ -290,6 +290,14 @@ proc mailcap_entry_create {} {
 proc mailcap_entry_cmd_add_part {_entry ptype ptxt} {
 	upvar $_entry entry
 
+	set cmd [dict get $entry cmd]
+	if {($ptype == 0) && ([llength $cmd] > 0)} {
+		if {[lindex [lindex $cmd end] 0] == 0} {
+			lset cmd end 1 [string cat [lindex [lindex $cmd end] 1] $ptxt]
+			dict set entry cmd $cmd
+			return
+		}
+	}
 	dict lappend entry cmd [list $ptype $ptxt]
 }
 
