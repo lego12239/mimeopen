@@ -131,6 +131,7 @@ proc mailcap_entries_get {mimetype} {
 proc mailcap_entry_parse {_ctx} {
 	upvar $_ctx ctx
 	set entry [mailcap_entry_create]
+	set cmd ""
 	# 0 - type field, 1 - command field, 2 - flag field
 	set state 0
 	set is_commented 0
@@ -205,36 +206,40 @@ proc mailcap_entry_parse {_ctx} {
 		1 {
 			switch $tok {
 			0 {
-				mailcap_entry_cmd_add_part entry 0 $tok_str
+				mailcap_entry_cmd_add_part cmd 0 $tok_str
 			}
 			1 {
+				dict set entry cmd $cmd
+				set cmd ""
 				set state 2
 			}
 			3 {
-				if {[mailcap_entry_cmd_is_empty $entry]} {
+				if {[mailcap_entry_cmd_is_empty $cmd]} {
 					warn_out [string cat \
 					  [[dict get $ctx getsrcloc_proc] ctx -1]\
 					  ": Empty command. Ignore this entry."]
 					set state 0
 					set entry [mailcap_entry_create]
+					set cmd ""
 				} else {
+					dict set entry cmd $cmd
 					break
 				}
 			}
 			4 {
-				mailcap_entry_cmd_add_part entry 0 $tok_str
+				mailcap_entry_cmd_add_part cmd 0 $tok_str
 			}
 			5 {
-				mailcap_entry_cmd_add_part entry 0 [string index $tok_str 1]
+				mailcap_entry_cmd_add_part cmd 0 [string index $tok_str 1]
 			}
 			6 {
-				mailcap_entry_cmd_add_part entry 0 " "
+				mailcap_entry_cmd_add_part cmd 0 " "
 			}
 			7 {
 				if {$tok_str eq "%s"} {
 					dict set entry is_want_data_from_stdin 0
 				}
-				mailcap_entry_cmd_add_part entry 1 $tok_str
+				mailcap_entry_cmd_add_part cmd 1 $tok_str
 			}
 			default {
 				error "unknown state/tok combination: $state/$tok"
@@ -243,16 +248,33 @@ proc mailcap_entry_parse {_ctx} {
 		}
 		2 {
 			switch $tok {
-			0 -
-			1 {
+			0 {
+				mailcap_entry_cmd_add_part cmd 0 $tok_str
 			}
+			1 -
 			3 {
-				break
+				set ret [mailcap_entry_set_field entry $cmd]
+				if {$ret ne ""} {
+					warn_out [string cat \
+					  [[dict get $ctx getsrcloc_proc] ctx -1]\
+					  $ret]
+				}
+				set cmd ""
+				if {$tok == 3} {
+					break
+				}
 			}
-			4 -
-			5 -
-			6 -
+			4 {
+				mailcap_entry_cmd_add_part cmd 0 $tok_str
+			}
+			5 {
+				mailcap_entry_cmd_add_part cmd 0 [string index $tok_str 1]
+			}
+			6 {
+				mailcap_entry_cmd_add_part cmd 0 " "
+			}
 			7 {
+				mailcap_entry_cmd_add_part cmd 1 $tok_str
 			}
 			default {
 				error "unknown state/tok combination: $state/$tok"
@@ -277,33 +299,68 @@ proc mailcap_entry_create {} {
 	  type ""\
 	  cmd ""\
 	  src ""\
+	  needsterminal 0\
 	  is_want_data_from_stdin 1]
 
 	return $entry
 }
 
-# Add a next part to a command
+# Set a field(it can be flag or named field).
 # prms:
 #  _entry - entry var name
-#  ptype  - a part type(0 - ordinary text, 1 - % sequence)
-#  ptxt   - a part text
-proc mailcap_entry_cmd_add_part {_entry ptype ptxt} {
+#  data   - a field text data
+# ret:
+#  "" - on ok
+#  STRING - warn message on fail
+proc mailcap_entry_set_field {_entry data} {
 	upvar $_entry entry
 
-	set cmd [dict get $entry cmd]
+	if {[mailcap_entry_cmd_is_flag $data]} {
+		set flag [string tolower [string trim [lindex $data end 1]]]
+		switch -exact $flag {
+		"needsterminal" {
+			dict set entry needsterminal 1
+		}
+		default {
+			return ": Unknown flag '$flag'. Ignore it."
+		}
+		}
+	} else {
+		set field [mailcap_entry_cmd_split_nv $data]
+		if {[llength $field] == 0} {
+			return [string cat ": Unknown field format "\
+			  "'[mailcap_entry_cmd_get_rawcmd $data]'. Ignore it."]
+		}
+		switch -exact [lindex $field 0] {
+		default {
+			return ": Unknown field '[lindex $field 0]'. Ignore it."
+		}
+		}
+	}
+
+	return ""
+}
+
+# Add a next part to a cmd
+# prms:
+#  _cmd - command var name
+#  ptype  - a part type(0 - ordinary text, 1 - % sequence)
+#  ptxt   - a part text
+proc mailcap_entry_cmd_add_part {_cmd ptype ptxt} {
+	upvar $_cmd cmd
+
 	if {($ptype == 0) && ([llength $cmd] > 0)} {
-		if {[lindex [lindex $cmd end] 0] == 0} {
-			lset cmd end 1 [string cat [lindex [lindex $cmd end] 1] $ptxt]
-			dict set entry cmd $cmd
+		if {[lindex $cmd end 0] == 0} {
+			lset cmd end 1 [string cat [lindex $cmd end 1] $ptxt]
 			return
 		}
 	}
-	dict lappend entry cmd [list $ptype $ptxt]
+	lappend cmd [list $ptype $ptxt]
 }
 
-proc mailcap_entry_cmd_is_empty {entry} {
+proc mailcap_entry_cmd_is_empty {cmd} {
 
-	foreach part [dict get $entry cmd] {
+	foreach part $cmd {
 		if {[lindex $part 0] != 0} {
 			return 0
 		}
@@ -313,6 +370,62 @@ proc mailcap_entry_cmd_is_empty {entry} {
 	}
 
 	return 1
+}
+
+proc mailcap_entry_cmd_is_flag {cmd} {
+	if {[llength $cmd] != 1} {
+		return 0
+	}
+	if {[lindex $cmd 0 0] != 0} {
+		return 0
+	}
+	if {[regexp {^[[:space:]]+$} [lindex $cmd 0 1]]} {
+		return 0
+	}
+	if {[string first "=" [lindex $cmd 0 1]] >= 0} {
+		return 0
+	}
+
+	return 1
+}
+
+# Split command to a field name and a command ("name=cmd").
+# prms:
+#  cmd - a command list
+# ret:
+#  "" - on format error(no "=", etc)
+#  list - 1 item is a field name, 2 item is a command
+proc mailcap_entry_cmd_split_nv {cmd} {
+	if {[lindex $cmd 0 0] != 0} {
+		return ""
+	}
+	set pos [string first "=" [lindex $cmd 0 1]]
+	if {$pos < 0} {
+		return ""
+	}
+	set fname [string trim [string range [lindex $cmd 0 1] 0 $pos-1]]
+	set fname [string tolower $fname]
+	lset cmd 0 1 [string range [lindex $cmd 0 1] $pos+1 end]
+
+	return [list $fname $cmd]
+}
+
+proc mailcap_entry_cmd_get_rawcmd {cmd} {
+	set cmd ""
+
+	foreach part $cmd {
+		switch -- [lindex $part 0] {
+		0 -
+		1 {
+			append cmd [lindex $part 1]
+		}
+		default {
+			error "Unknown cmd part type: [lindex $part 0]"
+		}
+		}
+	}
+
+	return $cmd
 }
 
 proc mailcap_entry_cmd_subs {entry {vals ""}} {
