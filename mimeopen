@@ -27,9 +27,11 @@
 
 lappend auto_path ~/work/libs/tcl
 package require getopt
+package require simpleconf
 
 
-set term_cmd "xterm -e "
+set conf [dict create\
+  term_cmd {xterm -e}]
 set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
   /usr/share/etc/mailcap /usr/local/etc/mailcap]
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
@@ -595,7 +597,7 @@ proc mailcap_run {mimetype fname} {
 		dbg_out "Try open '$fname' with command '$cmd'"
 		set exec_args [list sh -c "$cmd"]
 		if {([dict get $entry needsterminal]) && (![is_run_from_term])} {
-			set exec_args [linsert $exec_args 0 xterm -e]
+			set exec_args [linsert $exec_args 0 {*}[dict get $::conf term_cmd]]
 		}
 		if {[dict get $entry is_want_data_from_stdin]} {
 			lappend exec_args <$fname >@stdout
@@ -694,6 +696,11 @@ proc parse_opts {} {
 # MAIN
 ######################################################################
 parse_opts
+
+if {[file exists $env(HOME)/.mimeopen.conf]} {
+	set conf [simpleconf::load_from_file -default $conf\
+	  $env(HOME)/.mimeopen.conf]
+}
 
 if {[llength [array names env -exact MAILCAPS]] == 1} {
 	set MAILCAP_FILES [split $env(MAILCAPS) ":"]
