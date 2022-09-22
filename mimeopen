@@ -25,7 +25,7 @@
 #
 # https://github.com/lego12239/mimeopen
 
-lappend auto_path ~/work/libs/tcl/getopt
+lappend auto_path ~/work/libs/tcl
 package require getopt
 
 
