@@ -39,7 +39,11 @@ set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
 set debug 0
 set dry_run 0
 set opt_foreground 0
+set opt_separate 0
 set entries [dict create]
+set fnames [dict create]
+set fnames_order [list]
+
 
 proc dbg_out {msg} {
 	if {!$::debug} {
@@ -251,8 +255,11 @@ proc mailcap_entry_parse {_ctx} {
 				mailcap_entry_cmd_add_part cmd 0 " "
 			}
 			7 {
-				if {$tok_str eq "%s"} {
+				if {[lsearch -exact "%s %S" $tok_str] >= 0} {
 					dict set entry is_want_data_from_stdin 0
+				}
+				if {$tok_str eq "%S"} {
+					dict set entry is_allow_manyfiles 1
 				}
 				mailcap_entry_cmd_add_part cmd 1 $tok_str
 			}
@@ -315,7 +322,8 @@ proc mailcap_entry_create {} {
 	  cmd ""\
 	  src ""\
 	  needsterminal 0\
-	  is_want_data_from_stdin 1]
+	  is_want_data_from_stdin 1\
+	  is_allow_manyfiles 0]
 
 	return $entry
 }
@@ -453,7 +461,12 @@ proc mailcap_entry_cmd_subs {entry {vals ""}} {
 		}
 		1 {
 			if {[dict exists $vals [lindex $part 1]]} {
-				append cmd [dict get $vals [lindex $part 1]]
+				if {[lindex $part 1] eq "%S"} {
+					append cmd [_mailcap_entry_cmd_subs_S\
+					  [dict get $vals [lindex $part 1]]]
+				} else {
+					append cmd [dict get $vals [lindex $part 1]]
+				}
 			}
 		}
 		default {
@@ -463,6 +476,20 @@ proc mailcap_entry_cmd_subs {entry {vals ""}} {
 	}
 
 	return $cmd
+}
+
+proc _mailcap_entry_cmd_subs_S {fnames} {
+	set res ""
+
+	foreach fname $fnames {
+		set parts [split $fname ']
+		append res " '[lindex $parts 0]'"
+		for {set i 1} {$i < [llength $parts]} {incr i} {
+			append res "\\''[lindex $parts $i]'"
+		}
+	}
+
+	return $res
 }
 
 # ret:
@@ -579,51 +606,104 @@ proc _getsrcloc_for_fh {_ctx {lineno_off 0}} {
 ######################################################################
 # MAILCAP RUN ROUTINES
 ######################################################################
-proc mailcap_run {mimetype fname} {
-	set entries_list [mailcap_entries_get [dict get $mimetype type]]
+proc mailcap_open {mimetype fname} {
+	set entries_list [mailcap_entries_get $mimetype]
 	if {[llength $entries_list] == 0} {
 		err_out [string cat "Don't know how to open "\
-		  [join [dict get $mimetype type] "/"] ": " $fname]
+		  [join $mimetype "/"] ": " $fname]
 		return
 	}
 
 	set err_msg ""
-	set vals [dict create \
-	  "%s" $fname\
-	  "%t" [join [dict get $mimetype type] "/"]]
 	foreach entry $entries_list {
+		set vals [dict create \
+		  "%s" $fname\
+		  "%S" [list $fname]\
+		  "%t" [join $mimetype "/"]]
 		dbg_out "Try use for '$fname' entry '$entry'"
 		set cmd [mailcap_entry_cmd_subs $entry $vals]
-		dbg_out "Try open '$fname' with command '$cmd'"
-		set exec_args [list sh -c "$cmd"]
-		if {([dict get $entry needsterminal]) && (![is_run_from_term])} {
-			set exec_args [linsert $exec_args 0 {*}[dict get $::conf term_cmd]]
-		}
+		dbg_out "Try open '$fname' with command \"$cmd\""
+
 		if {[dict get $entry is_want_data_from_stdin]} {
-			lappend exec_args <$fname >@stdout
+			set ret [_mailcap_open_any $entry $cmd $fname]
 		} else {
-			lappend exec_args >@stdout
+			set ret [_mailcap_open_any $entry $cmd]
 		}
-		if {!$::opt_foreground} {
-			if {(![dict get $entry needsterminal]) || (![is_run_from_term])} {
-				lappend exec_args "&"
-			}
+		if {[lindex $ret 0] == 0} {
+			return
+		} elseif {[lindex $ret 0] == -1} {
+			append err_msg "cmd \"$cmd\" fail with error message:\
+			  [lindex $ret 1]\n"
 		}
-		if {$::dry_run} {
-			puts "CMD: '$cmd'"
-			set res ""
-		} else {
-			if {![catch {exec {*}$exec_args} res]} {
-				return
-			}
-		}
-		dbg_out "cmd '$cmd' fail with error message: $res"
-		append err_msg "cmd '$cmd' fail with error message: $res\n"
 	}
 	if {$::dry_run} {
 		return
 	}
 	err_out $err_msg
+}
+
+proc mailcap_open_many {mimetype fnames} {
+	set entries_list [mailcap_entries_get $mimetype]
+	if {[llength $entries_list] == 0} {
+		err_out [string cat "Don't know how to open "\
+		  [join $mimetype "/"] ": " $fnames]
+		return
+	}
+
+	set err_msg ""
+	foreach entry $entries_list {
+		dbg_out "Try use for '$fnames' entry '$entry'"
+		if {([dict get $entry is_allow_manyfiles]) &&
+		    (![dict get $entry is_want_data_from_stdin])} {
+			set vals [dict create \
+			  "%S" $fnames\
+			  "%t" [join $mimetype "/"]]
+			set cmd [mailcap_entry_cmd_subs $entry $vals]
+			dbg_out "Try open '$fnames' with command \"$cmd\""
+			set ret [_mailcap_open_any $entry $cmd]
+			if {[lindex $ret 0] == 0} {
+				return
+			} elseif {[lindex $ret 0] == -1} {
+				append err_msg "cmd \"$cmd\" fail with error message:\
+				  [lindex $ret 1]\n"
+			}
+		} else {
+			foreach fname $fnames {
+				mailcap_open $mimetype $fname
+			}
+		}
+	}
+	if {$::dry_run} {
+		return
+	}
+	err_out $err_msg
+}
+
+proc _mailcap_open_any {entry cmd {fname ""}} {
+	set exec_args [list sh -c "$cmd"]
+	if {([dict get $entry needsterminal]) && (![is_run_from_term])} {
+		set exec_args [linsert $exec_args 0 {*}[dict get $::conf term_cmd]]
+	}
+	if {$fname ne ""} {
+		lappend exec_args <$fname >@stdout
+	} else {
+		lappend exec_args >@stdout
+	}
+	if {!$::opt_foreground} {
+		if {(![dict get $entry needsterminal]) || (![is_run_from_term])} {
+			lappend exec_args "&"
+		}
+	}
+	if {$::dry_run} {
+		puts "CMD: \"$cmd\""
+		return [list 1]
+	} else {
+		if {[catch {exec {*}$exec_args} res]} {
+			dbg_out "cmd \"$cmd\" fail with error message: $res"
+			return [list -1 $res]
+		}
+	}
+	return [list 0]
 }
 
 ######################################################################
@@ -651,6 +731,7 @@ proc mimetype_parse {str} {
 proc parse_opts {} {
 	global argv
 	set optsspec {
+	  "-s --separate --separately" 0
 	  "-f --foreground" 0
 	  "-d --debug" 0
 	  "--dry-run" 0
@@ -661,6 +742,9 @@ proc parse_opts {} {
 
 	while {[llength [set ov [getopt::next ctx argv]]] > 0} {
 		switch -glob -- [lindex $ov 0] {
+		"-s --separate --separately" {
+			set ::opt_separate 1
+		}
 		"-f --foreground" {
 			set ::opt_foreground 1
 		}
@@ -677,6 +761,8 @@ proc parse_opts {} {
 		"-h --help" {
 			puts "USAGE: [file tail $::argv0] FILE_NAME ..."
 			puts " Options:"
+			puts "  -s, --separate"
+			puts "               open each file separately"
 			puts "  -f, --foreground"
 			puts "               open files in the foreground"
 			puts "  -d, --debug  output debug info"
@@ -713,5 +799,20 @@ dbg_out "ENTRIES=$entries"
 foreach fname $argv {
 	set mimetype [mimetype_parse [exec file -b -i $fname]]
 	dbg_out "mimetype for '$fname' is '$mimetype'"
-	mailcap_run $mimetype $fname
+	if {$opt_separate} {
+		mailcap_open [dict get $mimetype type] $fname
+	} else {
+		if {[dict exists $fnames [dict get $mimetype type]]} {
+			dict lappend fnames [dict get $mimetype type] $fname
+		} else {
+			dict set fnames [dict get $mimetype type] [list $fname]
+			lappend fnames_order [dict get $mimetype type]
+		}
+	}
+}
+
+if {!$opt_separate} {
+	foreach mimetype $fnames_order {
+		mailcap_open_many $mimetype [dict get $fnames $mimetype]
+	}
 }
