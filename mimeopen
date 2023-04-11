@@ -671,6 +671,7 @@ proc mailcap_open_many {mimetype fnames} {
 			foreach fname $fnames {
 				mailcap_open $mimetype $fname
 			}
+			return
 		}
 	}
 	if {$::dry_run} {
