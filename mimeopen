@@ -31,7 +31,8 @@ package require simpleconf
 
 
 set conf [dict create\
-  term_cmd {xterm -e}]
+  term_cmd {xterm -e}\
+  shell_cmd {sh -c}]
 set MAILCAP_FILES [list $env(HOME)/.mailcap /etc/mailcap \
   /usr/share/etc/mailcap /usr/local/etc/mailcap]
 #set MAILCAP_FILES [list $env(HOME)/.mailcap_test]
@@ -43,6 +44,8 @@ set opt_separate 0
 set entries [dict create]
 set fnames [dict create]
 set fnames_order [list]
+# Derived from [dict get $conf shell_cmd].
+set shell_name ""
 
 
 proc dbg_out {msg} {
@@ -495,7 +498,7 @@ proc mailcap_entry_cmd_subs {entry {vals ""}} {
 			if {[dict exists $vals [lindex $part 1]]} {
 				if {[lindex $part 1] eq "%S"} {
 					append cmd " [cmdargs_escape\
-					  [dict get $vals [lindex $part 1]]]"
+					  [dict get $vals [lindex $part 1]] $::shell_name]"
 				} else {
 					append cmd [dict get $vals [lindex $part 1]]
 				}
@@ -699,7 +702,7 @@ proc mailcap_open_many {mimetype fnames} {
 }
 
 proc _mailcap_open_any {entry cmd {fname ""}} {
-	set exec_args [list sh -c "$cmd"]
+	set exec_args [list {*}[dict get $::conf shell_cmd] "$cmd"]
 	if {([dict get $entry needsterminal]) && (![is_run_from_term])} {
 		set exec_args [linsert $exec_args 0 {*}[dict get $::conf term_cmd]]
 	}
@@ -806,6 +809,8 @@ if {[file exists $env(HOME)/.mimeopen.conf]} {
 	set conf [simpleconf::load_from_file -default $conf\
 	  $env(HOME)/.mimeopen.conf]
 }
+set shell_name [lindex [dict get $::conf shell_cmd] 0]
+set shell_name [string range $shell_name [string last / $shell_name]+1 end]
 
 if {[llength [array names env -exact MAILCAPS]] == 1} {
 	set MAILCAP_FILES [split $env(MAILCAPS) ":"]
