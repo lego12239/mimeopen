@@ -2,12 +2,19 @@
 - rename entry cmd to view_cmd
 - rename entry src to _(we don't want to mix with entry flag fields),
   move is_want_data_from_stdin into _ too
-- add support for mailcap entries flags fields
 - add support for test flag
+- add option for opening file for editing/composing
 - add %{} support for command field
 - add option to pass several files to one command instance
 - add support for DIR instead of FILE_NAME as an argument
 - add option for parallel program run(in contrast to sequential, default mode)?
 - add autotests
-- add option for opening file for editing/composing
 - debug to stderr?
+- make a package from mailcap related routines?
+- add support for reading file names from stdin
+- add -0 option(for reading from stdin)
+- set exit code to exit code of a view/edit command(add --ok option to exit always with 0)
+- open term for needsterminal even if we already in a term
+- use a conf file for term_cmd option and for getopt path value
+- escape a command on generation (replace \ with \\ and " with \")
+
