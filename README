@@ -11,13 +11,14 @@ Dependencies
 mimeopen use:
 - file program(to detect a mime type of specified files).
 - getopt package(https://github.com/lego12239/getopt.tcl).
+- simpleconf package(https://github.com/lego12239/simpleconf.tcl).
 
 
 Setup
 ============
 
 Change the line(at the top of the mimeopen source) with auto_path variable
-modification to reflect getopt package location and then:
+modification to reflect getopt and simpleconf packages location and then:
 cp mimeopen ~/bin/
 ln -s ~/bin/mimeopen ~/bin/open
 
@@ -32,3 +33,23 @@ no MAILCAPS variable in an environment, then by default it value is:
 
 $HOME/.mailcap:/etc/mailcap:/usr/share/etc/mailcap:/usr/local/etc/mailcap
 
+Conf file
+=====
+
+mimeopen read, if exists, ~/.mimeopen.conf file to get some configuration.
+This file can contain:
+
+- term_cmd
+  A command to run a terminal("xterm -e" by default)
+- shell_cmd
+  A shell command to run open command("sh -c" by default)
+
+
+Mailcap
+======
+
+Extenstions:
+
+- %S:
+  Like %s, but allow many files to be substituted(instead of one like for %s)
+  separated with spaces. %S should be used without surrounding quotes.
