@@ -60,6 +60,38 @@ proc warn_out {msg} {
 	puts stderr "WARN: $msg"
 }
 
+# Escape specified arguments to allow using with "exec {sh -c "$cmd"}".
+# prms:
+#  cmdargs - list with arguments
+#  shell   - a shell with which a returned string will be used
+#            (supported: sh, bash)
+# ret:
+#  STRING  - a string with escaped arguments separated by spaces
+#
+proc cmdargs_escape {cmdargs {shell sh}} {
+	set res ""
+	set space ""
+
+	foreach arg $cmdargs {
+		switch -exact $shell {
+		sh -
+		bash {
+			set parts [split $arg ']
+			append res "${space}'[lindex $parts 0]'"
+			for {set i 1} {$i < [llength $parts]} {incr i} {
+				append res "\\''[lindex $parts $i]'"
+			}
+		}
+		default {
+			error "Unknown shell: $shell"
+		}
+		}
+		set space " "
+	}
+
+	return $res
+}
+
 proc is_run_from_term {} {
 	set fconf [fconfigure stdin]
 	if {![dict exists $fconf -mode]} {
@@ -462,8 +494,8 @@ proc mailcap_entry_cmd_subs {entry {vals ""}} {
 		1 {
 			if {[dict exists $vals [lindex $part 1]]} {
 				if {[lindex $part 1] eq "%S"} {
-					append cmd [_mailcap_entry_cmd_subs_S\
-					  [dict get $vals [lindex $part 1]]]
+					append cmd " [cmdargs_escape\
+					  [dict get $vals [lindex $part 1]]]"
 				} else {
 					append cmd [dict get $vals [lindex $part 1]]
 				}
@@ -476,20 +508,6 @@ proc mailcap_entry_cmd_subs {entry {vals ""}} {
 	}
 
 	return $cmd
-}
-
-proc _mailcap_entry_cmd_subs_S {fnames} {
-	set res ""
-
-	foreach fname $fnames {
-		set parts [split $fname ']
-		append res " '[lindex $parts 0]'"
-		for {set i 1} {$i < [llength $parts]} {incr i} {
-			append res "\\''[lindex $parts $i]'"
-		}
-	}
-
-	return $res
 }
 
 # ret:
