@@ -1,11 +1,43 @@
-Overview
+NAME
+====
+
+mimeopen - open files with a program specific to its mime type
+
+
+SYNOPSIS
 ========
 
-mimeopen is an utility for opening files with a program specific to its mime
-type(based on mailcap files).
-It use a mailcap file(rfc1524) to detect a right command line for an each file.
+mimeopen [OPTIONS] FILE_NAME ...
 
-Dependencies
+
+DESCRIPTION
+===========
+
+mimeopen is an utility for opening files with a program specific to its mime
+type(based on mailcap files).  It use a mailcap file(rfc1524) to detect a
+right command line for an each file.
+
+Locations for mailcap files can be specified with MAILCAPS environment variable.
+MAILCAPS contain pathes separated by colon(like in PATH variable). If there is
+no MAILCAPS variable in an environment, then by default it value is:
+
+$HOME/.mailcap:/etc/mailcap:/usr/share/etc/mailcap:/usr/local/etc/mailcap
+
+Options:
+  -s, --separate
+               open each file separately
+  -f, --foreground
+               open files in the foreground
+  -F, --no-filter
+               do not filter some mailcap entries(*/*)
+  -d, --debug  output debug info
+  --dry-run    output view command without executing
+  -v, --version
+               output a version
+  -h, --help   output this help
+
+
+DEPENDENCIES
 ============
 
 mimeopen use:
@@ -14,27 +46,17 @@ mimeopen use:
 - simpleconf package(https://github.com/lego12239/simpleconf.tcl).
 
 
-Setup
-============
+SETUP
+=====
 
 Change the line(at the top of the mimeopen source) with auto_path variable
 modification to reflect getopt and simpleconf packages location and then:
 cp mimeopen ~/bin/
 ln -s ~/bin/mimeopen ~/bin/open
 
-Using
-=====
 
-mimeopen FILE_NAME ...
-
-Locations for mailcap files can be specified with MAILCAPS environment variable.
-MAILCAPS contain pathes separated by colon(like in PATH variable). If there is
-no MAILCAPS variable in an environment, then by default it value is:
-
-$HOME/.mailcap:/etc/mailcap:/usr/share/etc/mailcap:/usr/local/etc/mailcap
-
-Conf file
-=====
+CONF FILE
+=========
 
 mimeopen read, if exists, ~/.mimeopen.conf file to get some configuration.
 This file can contain:
@@ -45,8 +67,8 @@ This file can contain:
   A shell command to run open command("sh -c" by default)
 
 
-Mailcap
-======
+MAILCAP
+=======
 
 Extenstions:
 
