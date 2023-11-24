@@ -41,6 +41,7 @@ set debug 0
 set dry_run 0
 set opt_foreground 0
 set opt_separate 0
+set opt_mimetype_filter 1
 set entries [dict create]
 set fnames [dict create]
 set fnames_order [list]
@@ -156,6 +157,11 @@ proc mailcap_entries_add {entry} {
 		set mimesubtype [lindex [dict get $entry type] 1]
 	} else {
 		set mimesubtype *
+	}
+	if {$::opt_mimetype_filter} {
+		if {($mimetype eq "*") && ($mimesubtype eq "*")} {
+			return
+		}
 	}
 	if {[dict exists $::entries $mimetype $mimesubtype]} {
 		set vals [dict get $::entries $mimetype $mimesubtype]
@@ -755,6 +761,7 @@ proc parse_opts {} {
 	set optsspec {
 	  "-s --separate --separately" 0
 	  "-f --foreground" 0
+	  "-F --no-filter" 0
 	  "-d --debug" 0
 	  "--dry-run" 0
 	  "-v --version" 0
@@ -766,6 +773,9 @@ proc parse_opts {} {
 		switch -glob -- [lindex $ov 0] {
 		"-s --separate --separately" {
 			set ::opt_separate 1
+		}
+		"-F --no-filter" {
+			set ::opt_mimetype_filter 0
 		}
 		"-f --foreground" {
 			set ::opt_foreground 1
@@ -785,6 +795,8 @@ proc parse_opts {} {
 			puts " Options:"
 			puts "  -s, --separate"
 			puts "               open each file separately"
+			puts "  -F, --no-filter"
+			puts "               do not filter some mailcap entries(*/*)"
 			puts "  -f, --foreground"
 			puts "               open files in the foreground"
 			puts "  -d, --debug  output debug info"
