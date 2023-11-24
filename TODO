@@ -16,5 +16,4 @@
 - set exit code to exit code of a view/edit command(add --ok option to exit always with 0)
 - open term for needsterminal even if we already in a term
 - use a conf file for term_cmd option and for getopt path value
-- escape a command on generation (replace \ with \\ and " with \")
-
+- -S option for ignore %S in mailcap("only separate")?
