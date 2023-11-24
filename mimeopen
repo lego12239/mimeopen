@@ -821,7 +821,7 @@ mailcap_load $MAILCAP_FILES
 dbg_out "ENTRIES=$entries"
 
 foreach fname $argv {
-	set mimetype [mimetype_parse [exec file -b -i $fname]]
+	set mimetype [mimetype_parse [exec file -L -b -i $fname]]
 	dbg_out "mimetype for '$fname' is '$mimetype'"
 	if {$opt_separate} {
 		mailcap_open [dict get $mimetype type] $fname
