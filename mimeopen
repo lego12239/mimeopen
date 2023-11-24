@@ -787,7 +787,7 @@ proc parse_opts {} {
 			set ::dry_run 1
 		}
 		"-v --version" {
-			puts "0.4"
+			puts "0.5"
 			exit
 		}
 		"-h --help" {
