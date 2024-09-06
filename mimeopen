@@ -783,7 +783,7 @@ proc opts_process {oname oval} {
 	}
 	v -
 	version {
-		puts "0.6"
+		puts "0.7"
 		exit
 	}
 	h -
