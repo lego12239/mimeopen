@@ -756,66 +756,64 @@ proc mimetype_parse {str} {
 	return $type
 }
 
-proc parse_opts {} {
-	global argv
-	set optsspec {
-	  "-s --separate --separately" 0
-	  "-f --foreground" 0
-	  "-F --no-filter" 0
-	  "-d --debug" 0
-	  "--dry-run" 0
-	  "-v --version" 0
-	  "-h --help" 0}
-
-	set ctx [getopt::mkctx $optsspec {err_on_unknown_opt 1}]
-
-	while {[llength [set ov [getopt::next ctx argv]]] > 0} {
-		switch -glob -- [lindex $ov 0] {
-		"-s --separate --separately" {
-			set ::opt_separate 1
-		}
-		"-F --no-filter" {
-			set ::opt_mimetype_filter 0
-		}
-		"-f --foreground" {
-			set ::opt_foreground 1
-		}
-		"-d --debug" {
-			set ::debug 1
-		}
-		"--dry-run" {
-			set ::dry_run 1
-		}
-		"-v --version" {
-			puts "0.5"
-			exit
-		}
-		"-h --help" {
-			puts "USAGE: [file tail $::argv0] FILE_NAME ..."
-			puts " Options:"
-			puts "  -s, --separate"
-			puts "               open each file separately"
-			puts "  -F, --no-filter"
-			puts "               do not filter some mailcap entries(*/*)"
-			puts "  -f, --foreground"
-			puts "               open files in the foreground"
-			puts "  -d, --debug  output debug info"
-			puts "  --dry-run    output view command without executing"
-			puts "  -v, --version"
-			puts "               output a version"
-			puts "  -h, --help   output this help"
-			exit
-		}
-		}
+proc opts_process {oname oval} {
+	switch -- $oname {
+	s -
+	separate -
+	separately {
+		set ::opt_separate 1
+	}
+	F -
+	no-filter {
+		set ::opt_mimetype_filter 0
+	}
+	f -
+	foreground {
+		set ::opt_foreground 1
+	}
+	d -
+	debug {
+		set ::debug 1
+	}
+	dry-run {
+		set ::dry_run 1
+	}
+	W {
+		set ::opt_warn 0
+	}
+	v -
+	version {
+		puts "0.6"
+		exit
+	}
+	h -
+	help {
+		puts "USAGE: [file tail $::argv0] FILE_NAME ..."
+		puts " Options:"
+		puts "  -s, --separate"
+		puts "               open each file separately"
+		puts "  -F, --no-filter"
+		puts "               do not filter some mailcap entries(*/*)"
+		puts "  -f, --foreground"
+		puts "               open files in the foreground"
+		puts "  -d, --debug  output debug info"
+		puts "  --dry-run    output view command without executing"
+		puts "  -W           suppress warning output"
+		puts "  -v, --version"
+		puts "               output a version"
+		puts "  -h, --help   output this help"
+		exit
+	}
 	}
 
+	return 0
 }
 
 
 ######################################################################
 # MAIN
 ######################################################################
-parse_opts
+getopt::parse opts_process argv
 
 if {[file exists $env(HOME)/.mimeopen.conf]} {
 	set conf [simpleconf::load_from_file -default $conf\
