@@ -758,36 +758,36 @@ proc mimetype_parse {str} {
 
 proc opts_process {oname oval} {
 	switch -- $oname {
-	s -
-	separate -
-	separately {
+	-s -
+	--separate -
+	--separately {
 		set ::opt_separate 1
 	}
-	F -
-	no-filter {
+	-F -
+	--no-filter {
 		set ::opt_mimetype_filter 0
 	}
-	f -
-	foreground {
+	-f -
+	--foreground {
 		set ::opt_foreground 1
 	}
-	d -
-	debug {
+	-d -
+	--debug {
 		set ::debug 1
 	}
-	dry-run {
+	--dry-run {
 		set ::dry_run 1
 	}
-	W {
+	-W {
 		set ::opt_warn 0
 	}
-	v -
-	version {
-		puts "0.7"
+	-v -
+	--version {
+		puts "0.8"
 		exit
 	}
-	h -
-	help {
+	-h -
+	--help {
 		puts "USAGE: [file tail $::argv0] FILE_NAME ..."
 		puts " Options:"
 		puts "  -s, --separate"
